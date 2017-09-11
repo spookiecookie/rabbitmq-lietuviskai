@@ -1,0 +1,896 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <title>RabbitMQ lietuviškai</title>
+  </head>
+  <body>
+<h1>Rabbit MQ eilės</h1>
+<h2>Eilių sukūrimo ir valdymo Sistema</h2>
+<h3>Sistemos architektūra, programinė įranga</h3>
+<p>Rabbit MQ ypatybės: asinchroniniai prane&scaron;imai, paskirstyta parengtis, stebėjimo priemonės. RabbitMQ natūraliai palaiko protokolą AMQP.</p>
+<p><strong><span style="font-family: 'Calibri',sans-serif;">Asinchroniniai prane&scaron;imai</span></strong> &ndash; Rabbit MQ palaiko asinchroninių prane&scaron;imų protokolus, prane&scaron;imų statymą į eiles, pristatymo patvirtinimą, lankstų paskirstymą į eiles, įvairiarū&scaron;ius mainų tipus.</p>
+<p><strong><span style="font-family: 'Calibri',sans-serif;">Paskirstyta parengtis</span></strong> &ndash; parengtis kaip stabilizuotos apkrovos klasteris auk&scaron;tam pasiekiamumui ir pralaidumui; federacija per daugybines prieinamumo zonas ir regionus.</p>
+<p>&nbsp;</p>
+<h2>AMQP</h2>
+<p>Advanced message queueing protocol &ndash; žinučių protokolas, kuris įgalina atitinkamas kliento aplikacijas komunikuoti su atitinkamais žinutes siunčiančiais tarpinės programinės įrangos brokeriais.</p>
+<h2>Brokeriai ir jų rolė</h2>
+<p>Žinučių brokeriai gauna žinutes i&scaron; publikuotojų (aplikacijų, kurios publikuoja jas, taip pat žinomų kaip prodiuseriai) ir nukreipia jas vartotojams (aplikacijoms, kurios jas apdoroja).</p>
+<h2>Modelis</h2>
+<p>Žinutės yra publikuojamos į mainus, kurie tuomet paskirsto žinučių kopijas į eiles naudodami taisykles, vadinamas jungtimis. AMQP brokeriai arba pristato žinutes vartotojams, prenumeruojantiems eiles, arba vartotojai paima žinutes i&scaron; eilų pagal pareikalavimą.</p>
+<p>Publikuojant žinutę, publikuotojas gali nurodyti įvairius žinutės atributus (žinutės metaduomenis). Kaikurie metaduomenys gali naudojami brokerio, tačiau likusi informacija visai nematoma brokeriui ir yra naudojama aplikacijose, gaunančiose žinutę.</p>
+<p>Tinklai yra nepatikimi ir aplikacijos gali negalėti apdoroti žinučių, taigi AMQP modelis turi žinučių patvirtinimo sąvoką: kai žinutė pristatoma vartotojui, tai vartotojas informuoja brokerį automati&scaron;kai arba kai tik aplikacijos kūrėjas pasirenka tai padaryti. Kai žinutės patvirtinimai yra naudojami, tai brokeris pilnai pa&scaron;alins žinutę i&scaron; eilės, tik kai gaus prane&scaron;imą &scaron;iai žinutei (arba žinučių grupei).</p>
+<p>Tam tikrai atvejais, pvz., kai žinutė negali būti nukreipta, žinutės gali būti gražintos publikuotojams, atmestos arba (jei brokeris įgyvendina plėtinį) įdėtos į &bdquo;mirusių lai&scaron;kų eilę&ldquo;. Publikuotojai pasirenka kaip apdoroti situacijas kaip &scaron;i publikuojant žinutes naudojant tam tikrus parametrus.</p>
+<p>Eilės, mainai ir jungtys bendrai vadinamos AMQP esybėmis.</p>
+<p>Pagal nutylėjimą mainai yra tiesioginiai mainai (angl. direct exchange).</p>
+<h3>Tiesioginiai mainai</h3>
+<p><span style="font-size: 11.0pt; line-height: 107%; font-family: 'Calibri',sans-serif;"><br style="page-break-before: auto;" /> </span></p>
+<p>Tiesioginiai mainai pristato žinutes remiantis paskirstymo raktu. Tiesioginiai mainai yra idealu žinučių paskirstymui transliuojant individualiais adresais. Tai veikia:</p>
+<ul>
+<li style="text-indent: -18.0pt;">eilė susisaisto su mainais naudojant paskirstymo raktą K</li>
+<li style="text-indent: -18.0pt;">kai nauja žinutė su paskirstymo raktu R atvyksta į tiesioginius mainus, tiesioginiai mainai paskirsto ją į eilę jei <span style="font-size: 14.0pt; line-height: 107%;">K=R.</span></li>
+</ul>
+<p>Tiesioginiai mainai dažnai naudojami paskirstyti užduotis tarp daugelio darbininkų (tos pačios taikomosios programos egzempliorių) ratinės sistemos būdu. Būtina suprasti, jog žinučių apkrovos i&scaron;lyginimas vykdomas tarp vartotojų, bet net tarp eilių.</p>
+<p>&nbsp;</p>
+<p><span style="font-size: 12.0pt; line-height: 107%; font-family: 'Calibri Light',sans-serif; color: #1f3763;"><br style="page-break-before: auto;" /> </span></p>
+<h3>Veduokliniai mainai</h3>
+<p><span style="font-size: 11.0pt; line-height: 107%; font-family: 'Calibri',sans-serif;"><br style="page-break-before: auto;" /> </span></p>
+<p>Veduokliniai mainai ignoruoja paskirstymo raktą ir žinutės yra paskirstomos į visas susaistytas eiles. Jei N eilių yra susaistyta į veduoklinius mainus, tai kai nauja žinutė yra publikuojama į mainus, žinutės kopija pristatoma į N eilių. Veduokliniai mainai yra idealu žinučių transliavimui.</p>
+<p>Kadangi veduokliniai mainai pristato žinutės kopiją į kiekvieną eilę, kuri susaistyta su jais, naudojimo atvejai yra pana&scaron;ūs, pvz., paskirstytos sistemos gali transliuoti įvairias būsenas ir konfiguracijos atnaujinimus.</p>
+<p><span style="font-size: 12.0pt; line-height: 107%; font-family: 'Calibri Light',sans-serif; color: #1f3763;"><br style="page-break-before: auto;" /> </span></p>
+<h3>Teminiai mainai</h3>
+<p>Teminiai mainai paskirsto žinutes į vieną ar daugiau eilių remiantis atitiktimi tarp žinutės paskirstymo rakto ir &scaron;ablono, kuris buvo panaudotas susaistyti eilę su mainais. Teminiai mainai dažnai naudojami įgyvendinti įvairius publikavimo/prenumeravimo &scaron;ablonų variantus. Teminiai mainai yra įprastai naudojami daugiaadresiniam žinučių paskirstymui.</p>
+<p>Teminiai mainai turi labai plačią naudojimo atvejų aibę, pvz.:</p>
+<ul>
+<li style="text-indent: -18.0pt;">paskirstant duomenis, aktualius specifinei geografinei vietai</li>
+<li style="text-indent: -18.0pt;">foninių užduočių apdorojimas daugelio darbininkų, kurių kiekvienas gali doroti tam tikrą aibę užduočių</li>
+<li style="text-indent: -18.0pt;"></li>
+</ul>
+<h3>Informacinės sistemos pajungimas ir atjungimas</h3>
+<p>Norint pajungti informacinės sistemos duomenų srautą į Rabbit MQ reikia vykdyti sekančią instrukciją.</p>
+<ul>
+<li style="text-indent: -18.0pt;">Instaliuoti Rabbit MQ , jei dar nėra instaliuotas, serveryje.</li>
+<li style="text-indent: -18.0pt;">Sukonfiguruoti Rabbit MQ serveryje.</li>
+</ul>
+<p>Nors Rabbit MQ gali pradėti veikti i&scaron; karto įjungus, tačiau gamybinei parengčiai gali prireikti konfigūravimo.</p>
+<h2>Rabbit MQ instaliacija serveryje</h2>
+<h3>Serverio konfigūravimas</h3>
+<h4>Konfiguracija</h4>
+<p>Sukurti arba redaguoti failą rabbitmq-env-conf.bat. Jo vieta nustatoma aplinkos kintamuoju RABBITMQ_CONF_ENV_FILE.</p>
+<h4>Failų ir direktorijų vietos</h4>
+<p><strong>Failų leidimai. </strong>Svarbu, kad RabbitMQ mazgo procesas turėtų failų skaitymo/ra&scaron;ymo/kūrimo teises.</p>
+<table style="border-collapse: collapse; border: none;">
+<tbody>
+<tr>
+<td style="border: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_BASE</p>
+</td>
+<td style="border: solid windowtext 1.0pt; border-left: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RabbitMQ bazinis katalogas, kuriame yra subkatalogai serverio duomenų bazės ir žurnalo failai.</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_CONFIG_FILE</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Kelias iki konfiguracijos failo, be .config plėtinio.</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_MNESIA_BASE</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Kataloge yra pakatlogiai RabbitMQ serverio mazgų duomenų bazei, žinučių saugyklai ir blokinio būsenos failams, vienam ar keliems mazgams. Būtina, kad RabbitMQ turėtų pakankamas teises skaityti, ra&scaron;yti ir kurti failus ir pakatalogius &scaron;iame kataloge betkuriuo metu.</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_MNESIA_DIR</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Katalogas, kuriam RabbitMQ mazgo Mnesia duomenų bazės failai yra padėti.</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_LOG_BASE</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Kataloge yra RabbitMQ serverio log failai.</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_LOGS</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Kelias iki RabbitMQ serverio Erlang log failų. &Scaron;i reik&scaron;mė negali būti nustelbta Windows operacinėje sistemoje.</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_SASL_LOGS</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Kelias iki RabbitMQ serverio Erlang SASL (System Application Support Libraries) log failo. Reik&scaron;mė negali būti nustelbta Windows operacinėje sistemoje.</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_PLUGINGS_DIR</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Katalogų, kuriuose įskiepia yra ir i&scaron; kur jie pakraunami, sąra&scaron;as. Tai yra toks kaip PATH kintamasis. Įskiepiai gali būti įdiegti į betkurį čia i&scaron;vardintą katalogą.</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_PLUGINS_EXPAND_DIR</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Darbinis katalogas naudojamas i&scaron;skleisti įskiepius kai serveris startuoja. Būtina, kad RabbitMQ naudotojas turėtų pakankamai teisių skaityti ir kurti failus ir katalogus &scaron;iame kataloge.</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_ENABLED_PLUGINS_FILE</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Failas užra&scaron;o įgalintus įskiepius. Kai įskiepis įgalinamas arba i&scaron;jungiamas &scaron;is failas yra perkuriamas. Svarbu, kad RabbitMQ naudotojas turėtų pakankamai teisių skaityti, ra&scaron;yti ir kurti &scaron;į failą betkuriuo metu.</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_PID_FILE</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Failas, kuriame proceso id yra užra&scaron;ytas naudoimui su `rabbitmqctl wait`.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<p>Reik&scaron;mės pagal nutylėjimą Windows operacinėje sistemoje</p>
+<table style="border-collapse: collapse; border: none;">
+<tbody>
+<tr>
+<td style="border: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_BASE</p>
+</td>
+<td style="border: solid windowtext 1.0pt; border-left: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">%APPDATA%\RabbitMQ</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_CONFIG_FILE</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">%RABBITMQ_BASE%\rabbitmq</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_MNESIA_BASE</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">%RABBITMQ_BASE%\db</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_MNESIA_DIR</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">%RABBITMQ_MNESIA_BASE%\%RABBITMQ_NODENAME%</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_LOG_BASE</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">%RABBITMQ_BASE%\log</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_LOGS</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">%RABBITMQ_LOG_BASE%\%RABBITMQ_NODENAME%.log</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_SASL_LOGS</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">%RABBITMQ_LOG_BASE%\%RABBITMQ_NODENAME%-sasl.log</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_PLUGINS_DIR</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">Installation-directory/plugins</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_PLUGINS_EXPAND_DIR</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">%RABBITMQ_MNESIA_BASE%\%RABBITMQ_NODENAME%-plugins-expand</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_ENABLED_PLUGINS_FILE</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">%RABBITMQ_BASE%\enabled_plugins</p>
+</td>
+</tr>
+<tr>
+<td style="border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">RABBITMQ_PID_FILE</p>
+</td>
+<td style="border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;">
+<p style="margin-bottom: .0001pt; line-height: normal;">(Not currently supported)</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<h4>Naudotojų prisijungimų palaikymas</h4>
+<p>AMQP protokolas turi funkciją Hearbeat, kad būtų užtikrinta, jog taikomosios programos lygmenyje greitai būtų pastebėti nutrūkę ry&scaron;iai ir neatsakantys mazgai. Heartbeat taip pat saugo nuo tinklinės įrangos, kuri gali nutraukti laisvus ry&scaron;ius, kuriais nevyksta jokie veiksmai.</p>
+<p>Heartbeat skirtasis laikas yra 60 sekundžių, tai laikas kuriam praėjus be veiksmų galima konstatuoti RabbitMQ serveryje arba naudotojo mazge, jog ry&scaron;ys nutrūkęs.</p>
+<p>Kai mazgas nustato, jog ry&scaron;ys nutrūkęs, tai mazgas turi pakartotinai prisijungti.</p>
+<p>Betkoks veiksmas skaitomas kaip Hearbeat. Naudotojų mazgai gali siųsti Heartbeat signalą, kad i&scaron;laikytų ry&scaron;į nenutraukiant jo.</p>
+<p>Heartbeat atjungimas nerekomenduojamas.</p>
+<h4>Heartbeat tarp mazgų</h4>
+<p>Kiekviena mazgų pora blokinyje yra sujungti transporto lygmeniu. Periodi&scaron;kai apsikeičiama žinutėmis tarp visų mazgų porų, kad būtų i&scaron;laikyti ry&scaron;iai ir nustatyti atsijungimai. Tikrinimo periodo didinimas gali sustiprinti blokinio atsparumą trumpalaikiams tinklo sutrikimams, tačiau laikas, per kurį aptinkamas tinklo gedimas, pailgėja. Visi mazgai privalo naudoti tą pačią net_ticktime reik&scaron;mę.j</p>
+<h4>Eilių ir prane&scaron;imų TTL</h4>
+<p>RabbitMQ prane&scaron;imai ir eilės gali turėti TTL.</p>
+<h5>Prane&scaron;imo eilėje TTL</h5>
+<p>TTL nustatomas eilei x-message-ttl argumentu i&scaron;kvienčiant queue.declare. Žinutė, buvusi eilėje ilgiau nei TTL reik&scaron;mė, laikoma negyva. Žinutė, siųsta į kelias eiles gali mirti skirtingais laikais, arba visai nemirti, priklausomai nuo eilės, kurioje žinutė yra.</p>
+<p>Serveris užtikrina, jog negyvos žinutės nebus jokiame basic.get-ok arba basic.delivery methode. Serveris pasistengs atsikratyti žinute i&scaron; karto arba po kurio laiko, kai vir&scaron;ytas jų TTL. Žinutės mirtis eilėje neturi poveikio tos pačios žinutės gyvenimui kitose eilėse.</p>
+<p>TTL nustatomas pagal taisyklę n &gt;= 0, ir rei&scaron;kia milisekundes.</p>
+<p>Prane&scaron;imas, kuris gali būti eilėje daugiausia 60 sekundžių:</p>
+<p><span style="color: #8000ff; background: white;">var</span><span style="background: white;"> args </span><strong><span style="color: navy; background: white;">=</span></strong> <strong><span style="color: blue; background: white;">new</span></strong><span style="background: white;"> Dictionary</span><strong><span style="color: navy; background: white;">&lt;</span></strong><span style="color: #8000ff; background: white;">string</span><strong><span style="color: navy; background: white;">,</span></strong> <strong><span style="color: blue; background: white;">object</span></strong><strong><span style="color: navy; background: white;">&gt;();</span></strong></p>
+<p><span style="background: white;">args</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">Add</span><strong><span style="color: navy; background: white;">(</span></strong><span style="color: gray; background: white;">"x-message-ttl"</span><strong><span style="color: navy; background: white;">,</span></strong> <span style="color: #ff8000; background: white;">60000</span><strong><span style="color: navy; background: white;">);</span></strong></p>
+<p><span style="background: white;">model</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">QueueDeclare</span><strong><span style="color: navy; background: white;">(</span></strong><span style="color: gray; background: white;">"myqueue"</span><strong><span style="color: navy; background: white;">,</span></strong> <strong><span style="color: blue; background: white;">false</span></strong><strong><span style="color: navy; background: white;">,</span></strong> <strong><span style="color: blue; background: white;">false</span></strong><strong><span style="color: navy; background: white;">,</span></strong> <strong><span style="color: blue; background: white;">false</span></strong><strong><span style="color: navy; background: white;">,</span></strong><span style="background: white;"> args</span><strong><span style="color: navy; background: white;">);</span></strong></p>
+<p>&nbsp;</p>
+<p>Taip pat galima nustatyti TTL per taisykles. Reikia pridėti raktą message-ttl prie taisyklės apibrėžimo. Pvz.: pridėti 60 sekundžių TTL visoms eilėms</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbitmqctl </span>set_policy TTL ".*" "{""message-ttl"":60000}" &ndash;-apply-to queues</p>
+<h5>&nbsp;</h5>
+<p>Jei TTL nustatytas 0, tai žinutės tampa negaliojančios kai tik patenka į eilę nebent jos gali būti pristatytos vartotojui nedelsiant.</p>
+<p>&nbsp;</p>
+<h5>Prane&scaron;imo TTL</h5>
+<p>Galima nustatyti TTL konkrečiai žinutei: reikia nustatyti reik&scaron;mę (milisekundėmis) expiration lauke, esančiame basic AMPQ klasėje, kai siunčiamas basic.publish. Jei abi reik&scaron;mės (ir eilės, ir žinutės nustatytos), tai pirmenybė teikiama mažesnei reik&scaron;mei.</p>
+<p>&nbsp;<span style="color: #8000ff; background: white;">byte</span><strong><span style="color: navy; background: white;">[]</span></strong><span style="background: white;"> messageBodyBytes </span><strong><span style="color: navy; background: white;">=</span></strong><span style="background: white;"> System</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">Text</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">Encoding</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">UTF8</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">GetBytes</span><strong><span style="color: navy; background: white;">(</span></strong><span style="color: gray; background: white;">"Hello, world!"</span><strong><span style="color: navy; background: white;">);</span></strong></p>
+<p><span style="background: white;">&nbsp;</span></p>
+<p><span style="background: white;">IBasicProperties&nbsp;&nbsp; props </span><strong><span style="color: navy; background: white;">=</span></strong><span style="background: white;"> model</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">CreateBasicProperties</span><strong><span style="color: navy; background: white;">();</span></strong></p>
+<p><span style="background: white;">props</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">ContentType&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;</span><strong><span style="color: navy; background: white;">=</span></strong> <span style="color: gray; background: white;">"text/plain"</span><strong><span style="color: navy; background: white;">;</span></strong></p>
+<p><span style="background: white;">props</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">DeliveryMode&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><strong><span style="color: navy; background: white;">=</span></strong> <span style="color: #ff8000; background: white;">2</span><strong><span style="color: navy; background: white;">;</span></strong></p>
+<p><span style="background: white;">props</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">Expiration&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><strong><span style="color: navy; background: white;">=</span></strong> <span style="color: gray; background: white;">"3600000"</span><strong><span style="color: navy; background: white;">;</span></strong></p>
+<p><span style="background: white;">&nbsp;</span></p>
+<p><span style="background: white;">model</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">BasicPublish</span><strong><span style="color: navy; background: white;">(</span></strong><span style="background: white;">exchangeName</span><strong><span style="color: navy; background: white;">,</span></strong><span style="background: white;"> routingKey</span><strong><span style="color: navy; background: white;">,</span></strong><span style="background: white;"> props</span><strong><span style="color: navy; background: white;">,</span></strong><span style="background: white;"> messageBodyBytes</span><strong><span style="color: navy; background: white;">);</span></strong></p>
+<p>&nbsp;</p>
+<p>Eilės TTL</p>
+<p>&nbsp;Galima nustatyti eilės TTL keičiant x-expires argumentą vykdant queue.declare arba nustatant expires strategiją. Pvz., eilės, kuri nebegalioja po 30 minučių:</p>
+<p><span style="background: white;">Map</span><strong><span style="color: navy; background: white;">&lt;</span></strong><span style="background: white;">String</span><strong><span style="color: navy; background: white;">,</span></strong><span style="background: white;"> Object</span><strong><span style="color: navy; background: white;">&gt;</span></strong><span style="background: white;"> args </span><strong><span style="color: navy; background: white;">=</span></strong> <strong><span style="color: blue; background: white;">new</span></strong><span style="background: white;"> HashMap</span><strong><span style="color: navy; background: white;">&lt;</span></strong><span style="background: white;">String</span><strong><span style="color: navy; background: white;">,</span></strong><span style="background: white;"> Object</span><strong><span style="color: navy; background: white;">&gt;();</span></strong></p>
+<p><span style="background: white;">args</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">put</span><strong><span style="color: navy; background: white;">(</span></strong><span style="color: gray; background: white;">"x-expires"</span><strong><span style="color: navy; background: white;">,</span></strong> <span style="color: #ff8000; background: white;">1800000</span><strong><span style="color: navy; background: white;">);</span></strong></p>
+<p><span style="background: white;">channel</span><strong><span style="color: navy; background: white;">.</span></strong><span style="background: white;">queueDeclare</span><strong><span style="color: navy; background: white;">(</span></strong><span style="color: gray; background: white;">"myqueue"</span><strong><span style="color: navy; background: white;">,</span></strong> <strong><span style="color: blue; background: white;">false</span></strong><strong><span style="color: navy; background: white;">,</span></strong> <strong><span style="color: blue; background: white;">false</span></strong><strong><span style="color: navy; background: white;">,</span></strong> <strong><span style="color: blue; background: white;">false</span></strong><strong><span style="color: navy; background: white;">,</span></strong><span style="background: white;"> args</span><strong><span style="color: navy; background: white;">);</span></strong></p>
+<p><strong><span style="color: navy;">&nbsp;</span></strong></p>
+<p>arba nustatant strategiją</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbitmqctl </span>set_policy expiry ".*" "{""expires"":1800000}" &ndash;-apply-to queues</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Windows aplinkoje norint, kad įvyktų aplinkos pokyčiai būtina sudiegti paslaugą i&scaron; naujo.</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> cd </span>d:\net\5\RabbitMQ Server\rabbitmq_server-3.6.10\sbin <span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbitmq-service.bat </span>remove<span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbitmq-service.bat </span>install</p>
+<p>&nbsp;</p>
+<h2 style="margin-left: 36.0pt; text-indent: -36.0pt;">Tapatybės ir prieigos teisių nustatymas</h2>
+<p>Kai serveris įjungiamas pirmą kartą ir atrandama, jog duomenų bazė nėra inicializuota, tai inicializuojama naują duomenų bazė su tokiais i&scaron;tekliais:</p>
+<ul>
+<li style="text-indent: -18.0pt;">virtualus serveris pavadinimu &bdquo;/&ldquo;</li>
+<li style="text-indent: -18.0pt;">naudotojas pavadinimu &bdquo;guest&ldquo; ir slaptažodžiu &bdquo;guest&ldquo;, su pilnos prieigos į virtualų serverį &bdquo;/&ldquo; teise.</li>
+</ul>
+<p>Naudotojas &bdquo;guest&ldquo; gali prisijungti tik i&scaron; localhost. Rekomenduojama pa&scaron;alinti naudotoją &bdquo;guest&ldquo; arba pakeisti jo slaptažodį į privatų.</p>
+<p>Rabbit MQ palaiko LDAP, HTTP autentikaciją ir autorizaciją.</p>
+<p>&nbsp;</p>
+<h3>Autentikacija ir autorizacija</h3>
+<h4>Virtualūs serveriai</h4>
+<p>RabbitMQ yra daugiavartotoji&scaron;ka sistema: prisijungimai, apsikeitimai, eilės, saistymai, naudotojų leidimai, taisyklės priklauso virtualiems serveriams, loginėms grupėms. Virutalūs serveriai kuriami naudojant rabbitmqctl arba HTTP API.</p>
+<h5>Virtualus serveris ir klientų prisijungimai</h5>
+<p>Virtualus serveris turi pavadinimą, kai AMQP klientas jungiasi prie RabbitMQ, tai nurodo vhost pavadinimą, prie kurio jungtis. &ldquo;Tarpinis sujungimas&rdquo;, pvz., tarp eilės ir mainų skirtinguose vhost&rsquo;uose yra galimas tik, kai aplikacija jungiasi prie dviejų vhost&rsquo;ų tuo pačiu metu. Pavyzdžiui, aplikacija gali imti i&scaron; vieno vhost&rsquo;o, o tada perpublikuoti į kitą. Toks scenarijus galimas tarp serverių skirtinguose blokiniuose arba tame pačiame blokinyje.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
+<h5>LDAP įskiepis</h5>
+<p>Leidžia RabbitMQ serveriui atlikti autentikaciją ir autorizaciją naudojant i&scaron;orinį LDAP serverį. Prie&scaron; naudojant LDAP įskiepį būtina sukonfiguruoti.</p>
+<p>Konfiguracija pagal nutylėjimą leidžia visiem naudotojams pasiekti visus objektus, visuose vhost&lsquo;uose, tačiau nesuteikia administratoriaus teisių jiems.</p>
+<h6>Autorizacijos konfiguravimas</h6>
+<p>Kontroliuojama parametrais vhost_access_query, resource_access_query, tag_queries.</p>
+<p>Virtualus serveris privalo būti sukurtas&nbsp; RabbitMQ, kad naudotojas galėtų pasiekti virtualų serverį. Kiekvienas parametras apibrėžia užklausą, kuri apibrėžia ar naudotojas turi prieigą prie vhost&lsquo;o ar naudotojas turi prieigą prie i&scaron;tekliaus ir kokias žymes naudotojas turi.</p>
+<p>Reik&scaron;mės pagal nutylėjimą yra {constant, true}, {constant, true}, [{administrator, {constant, false}].</p>
+<p>Visos užklausos, vartojančios eilutes, palaiko eilučių keitinius kur kintamieji susiję su atliekama užklausa gali būti pateikti pakaitalui.</p>
+<p>vhost_access_query leidžia parametrus:</p>
+<table style="border-collapse: collapse; border: none;">
+<tbody>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${username}</p>
+</td>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-left: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;naudotojo vardas, pateiktas per autentikaciją,</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${user_dn}</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;unikalusis naudotojo vardas,</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${vhost}</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;virtualus serveris, kuriam užklausiama prieiga.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<p>resource_access_query leidžia parametrus:</p>
+<table style="border-collapse: collapse; border: none;">
+<tbody>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${username}</p>
+</td>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-left: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;naudotojo vardas, pateiktas per autentikaciją,</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${user_dn}</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;unikalusis naudotojo vardas,</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${vhost}</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;virtualus serveris, kuriame i&scaron;teklius yra,</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${resource}</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;i&scaron;tekliaus tipas (&ldquo;exchange&rdquo; arba &ldquo;queue&rdquo;),</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${name}</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;i&scaron;tekliaus pavadinimas,</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${permission}</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;prieigos prie pra&scaron;omo i&scaron;tekliaus tipas (vienas i&scaron; &ldquo;configure&rdquo;, &ldquo;write&rdquo;, &ldquo;read&rdquo;).</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<p>tag_queries leidžia parametrus:</p>
+<table style="border-collapse: collapse; border: none;">
+<tbody>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${username}</p>
+</td>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-left: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;naudotojo vardas, pateiktas per autentikaciją,</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="line-height: normal;">${user_dn}</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">&nbsp;unikalusis naudotojo vardas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<h6>Autorizacijos užklausos</h6>
+<p>Constant užklausa</p>
+<p>{constant, Bool}</p>
+<p>&nbsp;</p>
+<p>Exists užklausa</p>
+<p>{exists, Pattern} &ndash; pateikia keitinius į &scaron;abloną ir grąžina &ldquo;true&rdquo;, jei objektas su gautu DN egzistuoja.</p>
+<p>Pvz., suteikti prieigą prie visų vhost&rsquo;ų, kurie egzistuoja kaip organizaciniai vienetai ou=vhosts,dc=example,dc=com.</p>
+<p>{vhost_access_query, {exists, &ldquo;ou=${vhost},ou=vhosts,dc=example,dc=com&rdquo;}}</p>
+<p>&nbsp;</p>
+<p>In group užklausa</p>
+<p>{in_group, Pattern}</p>
+<p>{in_group, Pattern, AttributeName}</p>
+<p>Pateikia keitinius į &scaron;abloną, grąžina true, jei prisijungęs naudotojas yra narys (patikrinant arba member atributą, arba betkurį įvardytą atributą.</p>
+<p>Pvz., suteikia prieigą prie visų virtualių serverių, kai naudotojojas turi member atributą arba tinkamai pavadintą objektą (tokį kaip groupOfNames) viduje &ldquo;ou=vhosts,dc=example,dc=com&rdquo;.</p>
+<p>{{vhost_access_query, {in_group, &ldquo;cn=${vhost}-users,ou=vhosts,dc=example,dc=com&rdquo;}}</p>
+<p>&nbsp;</p>
+<p>In nested group užklausa</p>
+<p>{in_group_nested, Pattern}</p>
+<p>{in_group_nested, Pattern, AttributeName}</p>
+<p>{in_group_nested, Pattern, AttributeName, Scope}</p>
+<p>Paie&scaron;kos sritis nustatoma:</p>
+<p>subtree &ndash; ie&scaron;komi visi objektai, esantys po peržiūros baze,</p>
+<p>single_level &ndash; ie&scaron;komos visos grupės, esančio peržiūros bazėje.</p>
+<p>Reik&scaron;mė pagal nutylėjimą yra subtree.</p>
+<p>Pvz., suteikiama prieiga prie virtualių serverių, kai naudotojas yra grupinėje hierarchijoje, apibrėžtoje atirbuto <strong>member </strong>reik&scaron;mėmis ir yra &bdquo;ou=groups,dc=example,dc=com&ldquo; direktorijoje.</p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 6.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">[</span></p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp; </span><span style="font-size: 6.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{group_lookup_base,</span><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;"> &bdquo;ou</span><strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;">groups,dc</span><strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;">example,dc</span><strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;">com&ldquo;},</span></p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp; </span><span style="font-size: 6.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{vhost_access_query,</span><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;"> {in_group_nested, &bdquo;cn</span><strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;">${vhost}-groups,ou</span><strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;">groups,dc</span><strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;">example,dc</span><strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 6.0pt; font-family: 'Courier New'; color: black; background: white;">com&ldquo;}, &bdquo;member&ldquo;, single_level}]</span></p>
+<p>&nbsp;</p>
+<p>For užklausa</p>
+<p>{for, [{Name, Value, SubQuery},..] leidžia i&scaron;skaidyti užklausą ir apdoroti skirtingus atvejus skirtingomis užklausomis.</p>
+<p>&nbsp;</p>
+<p>Boolean užklausa</p>
+<p>{&lsquo;not&lsquo;, SubQuery}</p>
+<p>{&lsquo;and&lsquo;, [SubQuery1, SubQuery2, SubQuery3, ...]}</p>
+<p>{&lsquo;or&lsquo;, SubQuery1, SubQuery2, SubQuery3, ...]}</p>
+<p>Naudojama kombinuoti sub-užklausas su boolean logika. Kiekviena &lsquo;and&lsquo; ir &lsquo;or&lsquo; užklausa priimaneriboto ilgio sub-užklausų sąra&scaron;ą, gražina &lsquo;true&lsquo;, jei sub-užklausos turės &lsquo;true&lsquo;.</p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{resource_access_query,</span></p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{&lsquo;or&lsquo;,</span></p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">[{</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">'and',</span></p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">[{equals,</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;"> "${name}", "test1"},</span></p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{equals,</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;"> "${username}", "user1"}]},&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; </span></p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">'and',</span></p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">[{equals,</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;"> "${name}", "test2"},</span></p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">'</span><strong><span style="font-size: 10.0pt; font-family: 'Courier New'; color: blue; background: white;">not</span></strong><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">', {equals, "${username}", "user1"}}]}</span></p>
+<p style="margin-left: 36.0pt;"><span style="font-size: 10.0pt; line-height: 107%; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;</span><span style="font-size: 10.0pt; line-height: 107%; font-family: 'Courier New'; color: #0080ff; background: white;">]}}</span></p>
+<p>Equals užklausa</p>
+<p>{equals, StringSubQuery1, StringSubQuery2}</p>
+<p>Patikrina ar dvi eilutės viena kitą atitinka. Abi eilutės yra sub-užklausos. Naudojama, patikrinti vienos i&scaron; eilučių keitinio kintamuosius su konstantomis arba su atributų reik&scaron;me.</p>
+<p>Pvz., leidimų deklaruoti ir panaikinti mainus ir eilutes reminatis eilučių &lsquo;can-declare-exchanges&rsquo; ir &lsquo;can-declare-queues&rsquo; buvimu naudotojo apra&scaron;ymo lauke ir suteikia teises ra&scaron;yti ir skaityti mainuose visiems.</p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{resource_access_query,</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{for,</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;"> {[permission, configure, {equals, {attribute, "${user_dn}", "description"},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{string,</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;"> "can-declare-${resource}s"}</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">}</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{permission,</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;"> write, {constant, true}},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{permission,</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;"> read, {constant, true}}</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">]</span></p>
+<p><span style="font-size: 10.0pt; line-height: 107%; font-family: 'Courier New'; color: black; background: white;">&nbsp; </span><span style="font-size: 10.0pt; line-height: 107%; font-family: 'Courier New'; color: #0080ff; background: white;">}</span></p>
+<p>Match užklausa</p>
+<p>{match, StringSubQuery, RESubQuery}</p>
+<p>Paima eilutę ir reguliarųjį rei&scaron;kinį, ir patikrina, kad vienas atitinka kitą.</p>
+<p>Pvz.,</p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{resource_access_query,</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;"> {match, {string, "${name}"},</span></p>
+<p style="line-height: normal; text-autospace: none; margin: 0cm 0cm .0001pt 36.0pt;"><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{string,</span><span style="font-size: 10.0pt; font-family: 'Courier New'; color: black; background: white;"> "^${username}-"}}</span></p>
+<p style="margin-left: 36.0pt;"><span style="font-size: 10.0pt; line-height: 107%; font-family: 'Courier New'; color: #0080ff; background: white;">}</span></p>
+<p>Eilutės sub-užklausa</p>
+<p>{string, Pattern}</p>
+<p>Pakeičia argumentus eilutėje. Kadangi grąžinama eilutė, tai turėtų būti naudojama kartu su match arba equals užklausa.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
+<p>Atributų sub-užklausa</p>
+<p>{attribute, DNPattern, AttributeName}</p>
+<p>Grąžina gauto i&scaron; LDAP objekto atributo reik&scaron;mę. Kadangi grąžinama eilutė, tai turėtų būti naudojama kartu su match arba equals užklausa.</p>
+<p>Pavyzdinė konfiguracija, leidžianti visiems naudotojams prieiti prie valdymo įskiepio, tačiau nei vieno jų nepadaro administratoriumi. Prieiga prie virtualių serverių yra kontroliuojama grupės naryste kiekvienam virtualiam serveriui. Tik admin nariai gali trinti arba sieti mainus ir eiles, tačiau visi naudotojai gali skelbti mainus ir deklaruoti i&scaron; eilių.</p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">[</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{rabbit,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;"> [{auth_backends, [rabbit_auth_backend_ldap]}]},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{rabbitmq_auth_backend_ldap,</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">[</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;"> {servers,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ["my-ldap-server"]},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{user_dn_pattern,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; "cn-${username},ou</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">People,dc</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">example,dc</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: blue; background: white;">com</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">"},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{use_ssl},</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; false},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{port,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 389},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{log,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; false},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{vhost_access_query,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp; {in_group,</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; "ou</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">${vhost}-users,ou</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">vhosts,dc</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">example,dc</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: blue; background: white;">com</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">"}},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{resource_access_query,</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{for,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;"> [{permission, configure, {in_group, "cn</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">admin,dc</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">example,dc</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: blue; background: white;">com</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">"}},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{permission,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;"> write,</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{for,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;"> [{resource, queue, {in_group, "cn</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">admin,dc</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">example,dc</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: blue; background: white;">com</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">"}},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{resource,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;"> exchange, {constant, true}}]}},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{permission,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;"> read,</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{for,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;"> [{resource, exchange, {in_group, "cn</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">admin,dc</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">example,dc</span><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: red; background: white;">=</span></strong><strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: blue; background: white;">com</span></strong><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">"}},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{resource,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;"> queue, {constant, true}}]}}</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">]</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">}},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{tag_queries,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [{administrator, {constant, false}},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">{management,</span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;"> &nbsp;&nbsp;&nbsp; &nbsp;{constantm true}}]},</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">]</span></p>
+<p style="margin-bottom: .0001pt; line-height: normal; text-autospace: none;"><span style="font-size: 7.0pt; font-family: 'Courier New'; color: black; background: white;">&nbsp; </span><span style="font-size: 7.0pt; font-family: 'Courier New'; color: #0080ff; background: white;">}</span></p>
+<p><span style="font-size: 7.0pt; line-height: 107%; font-family: 'Courier New'; color: #0080ff; background: white;">].</span></p>
+<p>&nbsp;</p>
+<h6>Firehose sekiklis</h6>
+<p>Norint matyti kiekvieną žinutę, kuri publikuojama ir kiekvieną pristatomą žinutę, galima įjungti mainus (mazgui arba virtualiam serveriui), į kuriuos publikavimo ir pristatymo prane&scaron;imai bus pristatomi (kaip CC).&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
+<p>Galima naudoti rabbitmq_tracing įskiepį.</p>
+<h3>Paskirstyti RabbitMQ brokeriai</h3>
+<p>RabbitMQ palaiko protokolus, kurie i&scaron; esmės paskirstyti. Įprasta aplikacijoms i&scaron; skirtingų ma&scaron;inų jungtis prie vieno brokerio, netgi per internetą. Nepaisant to kartais būtina arba pageidautina padaryti RabbitMQ brokerį paskirstytu. Yra trys būdai pasiekti tai: blokinių formavimas, federavimas ir naudojant shovel.</p>
+<p>Nebūtina pasirinkti vieno būdo, galima sujungti blokinius su federacija arba shovel, arba ir vienu, ir kitu.</p>
+<h4>Blokinių formavimas</h4>
+<p>Blokinių formavimas apjungia kelis kompiuterius ma&scaron;inas kartu, kad sudarytų vieną loginį brokerį.</p>
+<p>Virtualūs serveriai, mainai, naudotojai, teisės yra automati&scaron;kai dubliuojami per visus mazgus blokinyje. Eilės gali būti viename mazge arba dubliuotos keliuose mazguose. Klientas prisijungęs prie betkurio mazgo gali matyti visas blokinio eiles, netgi jei eilės nėra tame mazge.</p>
+<p>Tipi&scaron;kai blokinių formavimas naudojamas auk&scaron;tam pasiekiamumui ir padidintam pralaidumui su kompiuteriais, esančiais vienoje vietoje.</p>
+<h4>Federavimas</h4>
+<p>Federavimas leidžia mainams arba eilei viename brokeryje gauti žinutes publikuotas į mainus arba eilę kitame brokeryje (brokeriai gali būti individualūs kompiuteriai arba blokiniai).</p>
+<p>Federuoti mainai yra sujungti vienos pusės ta&scaron;kas į ta&scaron;ką saitais.</p>
+<p>Federuotos eilės yra sujungtos vienos pusės ta&scaron;kas į ta&scaron;ką saitais.</p>
+<p>Tipi&scaron;kai federavimas naudojamas susieti brokerius per internetą pub/sub siuntinėjimui ir darbų statymo į eiles.</p>
+<h4>Shovel</h4>
+<p>Brokerių sujungimas su shovel koncepci&scaron;kai yra pana&scaron;us į jų sujungimą su federavimu, tačiau shovel veikia žemesniame lygmenyje.</p>
+<p>Shovel paprasčiausiai suvartoja žinutes i&scaron; vieno brokerio vienos eilės ir persiunčia jas į mainus kitame brokeryje.</p>
+<p>Tipi&scaron;kai shovel naudojamas susieti brokerius per internetą, kai reikia daugiau kontrolės nei suteikia federavimas.</p>
+<p>Santrauka</p>
+<table style="border-collapse: collapse; border: none;">
+<tbody>
+<tr>
+<td style="width: 249.05pt; border: solid #4472C4 1.0pt; border-right: none; background: #4472C4; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;"><strong><span style="color: white;">Federavimas/Shovel</span></strong></p>
+</td>
+<td style="width: 249.05pt; border: solid #4472C4 1.0pt; border-left: none; background: #4472C4; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;"><strong><span style="color: white;">Blokinių formavimas</span></strong></p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid #8EAADB 1.0pt; border-top: none; background: #D9E2F3; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Brokeriai yra logi&scaron;kai atskiri ir gali turėti skirtingus savininkus.</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid #8EAADB 1.0pt; border-right: solid #8EAADB 1.0pt; background: #D9E2F3; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Blokinys formuoja vieną loginį blokinį.</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid #8EAADB 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Brokeriai gali turėti skirtingas RabbitMQ ir Erlang versijas.</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid #8EAADB 1.0pt; border-right: solid #8EAADB 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Mazgai turi turėti tą pačią RabbitMQ versiją ir dažniausiai tą pačią Erlang versiją.</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid #8EAADB 1.0pt; border-top: none; background: #D9E2F3; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Brokeriai gali būti sujungti nepatikimais WAN saitais.</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid #8EAADB 1.0pt; border-right: solid #8EAADB 1.0pt; background: #D9E2F3; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Brokeriai turi būti sujungti per patikimus LAN saitus.</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid #8EAADB 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Brokeriai gali būti sujungti betkokia topologija. Saitai gali būti vien-arba-dvi pusiai.</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid #8EAADB 1.0pt; border-right: solid #8EAADB 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Visi mazgai jungiasi į visus kitus mazgus abiem kryptim.</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid #8EAADB 1.0pt; border-top: none; background: #D9E2F3; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Renkasi prieinamumą ir skaidinių toleranciją i&scaron; CAP teoremos.</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid #8EAADB 1.0pt; border-right: solid #8EAADB 1.0pt; background: #D9E2F3; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Renkasi neprie&scaron;taringumą ir skaidinių toleranciją i&scaron; CAP teoremos.</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid #8EAADB 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Kaikurie mainai brokeryje gali būti federuoti, o kaikurie lokalūs.</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid #8EAADB 1.0pt; border-right: solid #8EAADB 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Blokinių formavimas yra &ldquo;viskas arba nieko&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td style="width: 249.05pt; border: solid #8EAADB 1.0pt; border-top: none; background: #D9E2F3; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Klientas jungdamasis prie betkurio brokerio gali matyti tik to brokerio eiles.</p>
+</td>
+<td style="width: 249.05pt; border-top: none; border-left: none; border-bottom: solid #8EAADB 1.0pt; border-right: solid #8EAADB 1.0pt; background: #D9E2F3; padding: 0cm 5.4pt 0cm 5.4pt;" width="332">
+<p style="margin-bottom: .0001pt; line-height: normal;">Klientas, kuris jungiasi prie betkurio mazgo, gali matyti eiles visuose mazguose.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<h3>Blokinių formavimo vadovas</h3>
+<h4>Kas dubliuojama?</h4>
+<p>Visi duomenys ir būsena reikalingi RabbitMQ brokerio veikimui dubliuojami visuose mazguose. I&scaron;imtis yra prane&scaron;imų eilės, kurios pagal nutylėjimą yra viename mazge, tačiau jos yra matomos ir pasiekiamos i&scaron; visų mazgų.</p>
+<h4>Pagrindinio kompiuterio nustatymo reikalavimai</h4>
+<p>Visų blokinio narių hostname&lsquo;ai turi būti pasiekiami i&scaron; visų blokinio mazgų.</p>
+<h4>Blokinio formavimas</h4>
+<p>Galima suformuoti blokinį keliais būdais:</p>
+<ul>
+<li style="text-indent: -18.0pt;">rankiniu būdu su rabbitmqctl,</li>
+<li style="text-indent: -18.0pt;">deklaratyviai i&scaron;vardinant blokinio mazgus config faile,</li>
+<li style="text-indent: -18.0pt;">deklaratyviai su rabbitmq-autocluster.</li>
+</ul>
+<p>Blokinio sudėtis gali būti pakeista dinami&scaron;kai. Visi RabbitMQ brokeriai startuoja kaip veikiantys viename mazge. &Scaron;ie mazgai gali būti sujungti į blokinius ir po to paversti vėl individualiais brokeriais.</p>
+<h4>Trikčių tvarkymas</h4>
+<p>RabbitMQ brokeriai toleruoja individualių mazgų triktis. Mazgai gali startuoti ir sustoti bet kuriuo metu, kol jie gali susisiekti su žinomu sustabdymo metu blokinio nario mazgu.</p>
+<h4>Disko ir RAM mazgai</h4>
+<p>Mazgas gali dirbti naudodamas diską arba tik RAM. Dažniausiai naudojami diskiniai mazgai; RAM mazgai yra specialus atvejis, kai galima pagerinti na&scaron;umą blokiniui, kuriame dažni eilių, mainų arba saistymų pokyčiai.</p>
+<h4>Kaip mazgai (ir CLI įrankiai) autentikuojasi vienas kitam: Erlang slapukas</h4>
+<p>RabbitMQ mazgai ir CLI įrankiai (pvz., rabbitmqctl) naudoja slapuką nustatyti ar jiems leidžiama bendrauti tarpusavyje. Kiekvienas RabbitMQ gauna automati&scaron;kai sukurtą atsitiktinį slapuką faile, kai RabbitMQ serveris startuoja. Lengviausia yra leisti vienam mazgui sukurti slapuko failą, o po to sukurtą failą nukopijuoti į visus mazgus blokinyje.</p>
+<p>Windows operacinėje sistemoje slapukų failai gali būti</p>
+<p>- C:\Users\Current User\.erlang.cookie (%HOMEDRIVE% + %HOMEPATH%\.erlang.cookie)</p>
+<p>- C:\Documents and Settings\Current User\.erlang.cookie</p>
+<p>- C:\Windows\.erlang.cookie &ndash; RabbitMQ Windows tarnybai. Jei naudojama Windows tarnyba, tai slapukas turėtų būti abiejose vietose.</p>
+<h4>Nepriklausomų mazgų įjungimas</h4>
+<p>Blokiniai kuriami perkonfiguruojant egzistuojančius RabbitMQ mazgus į blokinių konfiguraciją. Pirma startuojami mazgai įprastu būdu:</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit1 </span>rabbitmq-server -detached <span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit2 </span>rabbitmq-server -detached<span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit3 </span>rabbitmq-server -detached</p>
+<p>&nbsp;</p>
+<p>Tai sukuria tris nepriklausomus RabbitMQ brokerius, po vieną kiekvienam mazgui, kaip patvirtina <em>cluster_status </em>komanda:</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit1 </span>rabbitmqctl cluster_status <span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Cluster status of node rabbit@rabbit1 ...</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">[{nodes,[{disc,[rabbit@rabbit1]}]},{running_nodes,[rabbit@rabbit1]}]</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">...done.</span><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit2 </span>rabbitmqctl cluster_status <span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Cluster status of node rabbit@rabbit2 ...</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">[{nodes,[{disc,[rabbit@rabbit2]}]},{running_nodes,[rabbit@rabbit2]}]</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">...done.</span><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit3 </span>rabbitmqctl cluster_status <span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Cluster status of node rabbit@rabbit3 ...</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">[{nodes,[{disc,[rabbit@rabbit3]}]},{running_nodes,[rabbit@rabbit3]}]</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">...done.</span></p>
+<p>&nbsp;</p>
+<h4>Blokinio sukūrimas</h4>
+<p>Norint sujungti mazgus į blokinį, reikia nurodyti mazgams susijungti su vienu mazgu. Reikia sustabdyti mazgą, kuris prisijungs, atlikti join_cluster komandą ir restartuoti RabbitMQ aplikaciją.</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit2 </span>rabbitmqctl stop_app<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Stopping node rabbit@rabbit2 ...done.</span><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit2 </span>rabbitmqctl join_cluster rabbit@rabbit1<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Clustering node rabbit@rabbit2 with [rabbit@rabbit1] ...done.</span><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit2 </span>rabbitmqctl start_app<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Starting node rabbit@rabbit2 ...done.</span></p>
+<p>Kartojant duotus veiksmus galima betkuriuo metu pridėti naujus mazgus į blokinį, kol blokinys veikia.</p>
+<p>Su komanda cluster_status matoma, jog mazgas prisijungia prie blokinio.</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit1 </span>rabbitmqctl cluster_status<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Cluster status of node rabbit@rabbit1 ...</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">[{nodes,[{disc,[rabbit@rabbit1,rabbit@rabbit2,rabbit@rabbit3]}]},</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;"> {running_nodes,[rabbit@rabbit3,rabbit@rabbit2,rabbit@rabbit1]}]</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">... done.</span></p>
+<p>&nbsp;</p>
+<p><strong>Dėmesio. </strong>Kai blokinys yra i&scaron;jungiamas, paskutinis i&scaron;jungiamas mazgas turi būti tas, kuris buvo įjungtas pirmas. Jei tai neįvyks, tai mazgai palauks 30 sekundžių, kol paskutinis diskinis mazgas įsijungs ir jie suges po to. Jei paskutinis i&scaron;jungiamas mazgas negali būti įjungtas, tai jį galima pa&scaron;alinti i&scaron; blokinio komanda forget_cluster_node.</p>
+<p>Jei visi blokinio mazgai sustoja vienu metu atsitiktine tvarka (pvz., dėl elektros energijos tiekimo sutrikimo), tai gali susidaryti situacija, kai visi mazgai &bdquo;manys&ldquo;, jog koks nors kitas mazgas juos sustabdė. Tokiu atveju galima naudoti force_boot komandą, kad mazgas vėl taptų įjungiamas.</p>
+<h4>Blokinio suskaidymas</h4>
+<p>Mazgai turi būti pa&scaron;alinami i&scaron; blokinio, kuomet jie nebeskaitomi blokinio dalimi. Pirmiausiai pa&scaron;aliname rabbit@rabbit3 i&scaron; blokinio, sugrąžindami jį į įprastą būseną. Tam turime sustabdyti RabbitMQ aplikaciją rabbit@rabbit3, atkurti mazgą ir paleisti RabbitMQ aplikaciją i&scaron; naujo.</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit3 </span>rabbitmqctl stop_app<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Stopping node rabbit@rabbit3 ...done.</span><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit3 </span>rabbitmqctl reset<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Resetting node rabbit@rabbit3 ...done.</span><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit3 </span>rabbitmqctl start_app<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Starting node rabbit@rabbit3 ...done.</span></p>
+<p>Taip pat galima pa&scaron;alinti mazgus nuotoliniu būdu. Tai naudinga, pvz., kai reikia susitvarkyti su neatsakančiu mazgu. Galime pa&scaron;alinti mazgą rabbit@rabbit1 i&scaron; rabbit@rabbit2.</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit1 </span>rabbitmqctl stop_app<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Stopping node rabbit@rabbit1 ...done.</span><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit2 </span>rabbitmqctl forget_cluster_node rabbit@rabbit1<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Removing node rabbit@rabbit1 from cluster ...done.</span></p>
+<p>Rabbit1 vis dar skaitys, kad yra blokinyje kartu su rabbit2, bandymai jį įjungti baigsis klaidos prane&scaron;imu. Būtina atkurti jį norint jį paleisti i&scaron; naujo.</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit1 </span>rabbitmqctl start_app<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Starting node rabbit@rabbit1 ...</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Error: inconsistent_cluster: Node rabbit@rabbit1 thinks it&lsquo;s clustered with node rabbit@rabbit2, but rabbit@rabbit2 disagrees</span><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit1 </span>rabbitmqctl reset<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Resetting node rabbit@rabbit1 ...done.</span><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit1 </span>rabbitmqctl start_app<span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">Starting node ...done.</span></p>
+<h4>Blokinio atnaujinimas</h4>
+<p>Kai atnaujinama i&scaron; vienos versijos į kitą, visas blokinys turi būti i&scaron;jungtas.</p>
+<p>&nbsp;</p>
+<h4>Blokinys viename kompiuteryje</h4>
+<p>Būtina suteikti mazgams skirtingus pavdinimus, duomenų saugojimo vietas, log failų vietas ir pajungti juos į skirtingus portus.</p>
+<p>Galima paleisti daugybę magų tame pačiame kompiuteryje pakartotinai vykdan rabbitmq-server.bat . Pavyzdžiui:</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">RABBITMQ_NODE_PORT=5672 RABBITMQ_NODENAME=rabbit rabbitmq-server -detached</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">RABBITMQ_NODE_PORT=5673 RABBITMQ_NODENAME=hare rabbitmq-server -detached</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">rabbitmqctl -n hare stop_app</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">rabbitmqctl -n hare join_cluster rabbit@`hostname -s`</span><span style="font-size: 11.0pt; font-family: 'Calibri',sans-serif;">rabbitmqctl -n hare start_app</span></p>
+<p>&nbsp;</p>
+<h4>Ugniasiene apsaugoti mazgai</h4>
+<p>Paprastai būtina atidaryti standartinius prievadus:</p>
+<p>4369, 5672, 5671, 25672, 15672, 61613, 61614, 1883, 8883, 15674, 15675.</p>
+<h4>Prisijungimas prie blokinio i&scaron; klientų</h4>
+<p>Klientas gali prisijungti įprastai prie betkurio mazgo blokinyje. Jei mazgas suges, o likes blokinys i&scaron;liks, tai klientas turėtų pastebėti, jog nutrūko ry&scaron;ys ir turėtų persijungti į kurį nors i&scaron;likusį mazgą.</p>
+<p>&nbsp;</p>
+<h2>Auk&scaron;to pasiekiamumo (veidrodinės) eilės</h2>
+<p>Pagal nutylėjimą eilės RabbitMQ blokinyje yra viename mazge (kuriame jos buvo apra&scaron;ytos). Tai yra prie&scaron;ingai apsikeitimams ir jungtims, kurie visada&nbsp; gali būti laikomi esantys visuose mazguose. Eilės gali būti veidrodinamos daugelyje mazgų. Kiekviena veidrodinama eilė sudaryta i&scaron; vieno pagrindinio ir vieno ar kelių veidrodžių. Seniausias veidrodis paauk&scaron;tinamas į pagrindinį, jei senasis pagrindinis pradingsta.</p>
+<p>Prane&scaron;imai publikuoti į eilę replikuojami į visus veidrodžius. Vartotojai yra prijungti prie pagrindinio nesvarbu prie kurio mazgo jie jungiasi, o veidrodžiai numeta prane&scaron;imus, kurie patvirtinti pagrindiniame. Eilės veidrodinimas padidina prieinamumą, tačiau nepaskirsto apkrovos tarp mazgų (visi mazgai daro visą darbą).</p>
+<p>Sprendimas reikalauja RabbitMQ blokinio vadinasi nebus gero suderinamumo tarp tinklo blokinių blokinyje. Dėl &scaron;ios priežasties eilių veidrodinimas nerekomenduojamas per WAN (nepaisant to klientai vistiek gali jungtis i&scaron; betkur).</p>
+<p>Paprastai pagrindinė eilė vadinama &bdquo;master&ldquo;, o eilės replikos vadinamos &bdquo;mirror&ldquo; (arba &bdquo;slave&ldquo;).</p>
+<p>&nbsp;</p>
+<h3>Kaip konfiguruojami veidrodžiai</h3>
+<h3>&nbsp;</h3>
+<p>Veidrodinimo parametrai konfiguruojami naudojant tvarkas.</p>
+<h3>Eilių argumentai, kontroliuojantys veidrodinimą</h3>
+<p>Norint padaryti eiles veidrodinamomis, reikia sukurti tvarką, kuri atitinka jas ir nustato tvarkos raktus ha-mode ir (pasirinktinai) ha-params.</p>
+<table style="border-collapse: collapse; border: none;">
+<tbody>
+<tr>
+<td style="width: 166.0pt; border: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">ha-mode</p>
+</td>
+<td style="width: 166.05pt; border: solid windowtext 1.0pt; border-left: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">ha-params</p>
+</td>
+<td style="width: 166.05pt; border: solid windowtext 1.0pt; border-left: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">Rezultatas</p>
+</td>
+</tr>
+<tr>
+<td style="width: 166.0pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">all</p>
+</td>
+<td style="width: 166.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">(nėra)</p>
+</td>
+<td style="width: 166.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">Eilė veidrodinama visuose mazguose blokinyje. Kai naujas mazgas pridedamas į blokinį, tai eilė bus veidrodinama į tą mazgą.</p>
+</td>
+</tr>
+<tr>
+<td style="width: 166.0pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">exactly</p>
+</td>
+<td style="width: 166.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">skaičius</p>
+</td>
+<td style="width: 166.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">Eilės egzempliorių skaičius blokinyje. Reik&scaron;mė 1 rei&scaron;kia, kad bus tik master eilė, be mirror. Jei mazgas, kuriame veikia master tampa neprieinamu, tai eilė taps neprieinama. Reik&scaron;mė 2 rei&scaron;kia, kad yra 1 master ir 1 mirror. Jei mazgas, kuriame veikia master eilė tampa neprieinamu, tai mirror eilė automati&scaron;kai taps master. EilėsMirrorSkaičius = EiliųSkaičius &ndash; 1. Jei yra mažiau nei skaičius mazgų blokinyje, tai eilė bus veidrodinama į visus mazgus. Jei yra daugiau nei skaičius mazgų blokinyje ir mazgas, kuriame yra veidrodis, sugenda tai naujas mirror bus sukurtas kitame mazge.</p>
+</td>
+</tr>
+<tr>
+<td style="width: 166.0pt; border: solid windowtext 1.0pt; border-top: none; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">nodes</p>
+</td>
+<td style="width: 166.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">node names</p>
+</td>
+<td style="width: 166.05pt; border-top: none; border-left: none; border-bottom: solid windowtext 1.0pt; border-right: solid windowtext 1.0pt; padding: 0cm 5.4pt 0cm 5.4pt;" width="221">
+<p style="margin-bottom: .0001pt; line-height: normal;">Eilė veidrodinama į mazgus, kurie i&scaron;vardinti node names. Node names, tai yra Erlang node names, kaip jie yra užra&scaron;yti `rabbitmqctl cluster_status` (įprastai tai yra rabbit@hostname). Jei kuris nors mazgas nėra blokinio dalis, tai nepriveda prie klaidos. Jei nei vienas mazgas i&scaron; sąra&scaron;o nėra prijungtas tuo metu, kai mazgas apra&scaron;omas, tai eilė bus sukurta mazge, prie kurio apra&scaron;antis klientas yra prisijungęs.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3>Kiek mazgų veidrodininti?</h3>
+<p>Rekomenduojama veidrodinti blokinius su 3 ar daugiau mazgų, mirror turi būti dauguma mazgų (t.y. jei yra 3 mazgai, tai veidrodinti 2 mazgus, jei 5, tai 3).</p>
+<h3>Master eilės vieta</h3>
+<p>Kiekviena eilė RabbitMQ turi namų direktoriją. Visi eilės veiksmai eina per master pirmiausiai ir tada replikuojami į mirror.</p>
+<p>Master eilės gali būti paskirstytos po mazgus naudojant kelias strategijas. Kuri strategija naudojama galima nustatyti naudojant eilės parametrą x-queue-master-locator, nustatant tvarkos queue-master-locator raktą arba nustatant raktą queue_master_locator konfiguracijos faile.</p>
+<p>Strategijos:</p>
+<ul>
+<li style="text-indent: -18.0pt;">pasirinkti mazgą, kuriame minimalus master skaičius: min-masters.</li>
+<li style="text-indent: -18.0pt;">pasirinkti mazgą, į kurį klientas, deklaruojantis eilę, prisijungia: client-local.</li>
+<li style="text-indent: -18.0pt;">pasirinkti atistitiktinį mazgą.</li>
+</ul>
+<h3>I&scaron;skirtinės eilės</h3>
+<p>I&scaron;skirtinės eilės i&scaron;trinamos, kai prisijungimas, kuris jas deklaravo, uždaromas. Dėl to, nenaudinga veidrodinti i&scaron;skirtinę eilę, kadangi kai ją turintis mazgas i&scaron;sijungs, prisijungimas bus uždarytas ir eilė turės būti i&scaron;trinta betkokiu atveju.</p>
+<p>Dėl to, i&scaron;skirtinės eilės nėra niekada veidrodinamos (net jei jos atitinka tvarką, kad turi būti veidrodinamos). Jos taip pat niekada nėra pastovios (net jei deklaruotos kaip pastovios).</p>
+<h3>Pavyzdžiai</h3>
+<p>Sekantis pavyzdys deklaruoja tvarką pavadinimu ha-all, kuris atitinka eiles, kurių vardai prasideda su &bdquo;ha.&ldquo; ir konfiguruoja veidrodinimą į visus mazgus blokinyje. Pvz.:</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit1 </span>rabbitmqctl set_policy ha-two &ldquo;^two\.&rdquo; ^ &nbsp;&nbsp;&nbsp;&nbsp;&ldquo;{&ldquo;&ldquo;ha-mode&rdquo;&rdquo;:&rdquo;&rdquo;exactly&rdquo;&rdquo;, &ldquo;&ldquo;ha-params&rdquo;&rdquo;:2,&rdquo;ha-sync-mode&rdquo;:&rdquo;automatic&rdquo;}&rdquo;</p>
+<p>&nbsp;</p>
+<p>Tvarka, kai eilės, kurių pavadinimai prasideda &bdquo;nodes.&ldquo; yra veidrodinamos į tam tikrus mazgus blokinyje:</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbit1 </span>rabbitmqctl set_policy ha-nodes &ldquo;^nodes\.&rdquo; \ &nbsp;&nbsp;&nbsp;&nbsp;&lsquo;{&ldquo;ha-mode&rdquo;:&rdquo;nodes&rdquo;, &ldquo;ha-params&rdquo;:[&ldquo;&rdquo;rabbit@nodeA&rdquo;, &ldquo;rabbit@nodeB&rdquo;]}&rsquo;</p>
+<p><span style="font-size: 10.0pt; line-height: 107%; font-family: 'Courier New';">&nbsp;</span></p>
+<h2>Veidrodinamos eilės realizacija ir semantika</h2>
+<p>Mirror eilės taiko operacijas, kurios įvykdomos master, lygiai ta pačia eilės tvarka kaip master, todėl yra toje pačioje būsenoje. Visi ne publish veiksmai eina tik į master, tuomet master transliuoja veiksmo efektą veidrodžiams. Taigi klientas vartojantis veidrodinamą eilę fakti&scaron;kai vartoja i&scaron; master.</p>
+<p>&nbsp;</p>
+<p>Jei mirror sugenda, tai master lieka master ir nei vienas klientas neturi imtis kokių nors veiksmų arba būti informuotas apie gedimą. Mirror gedimai gali būti pastebėti ne i&scaron; karto ir prane&scaron;imų publikavimas gali užtrukti.</p>
+<p>&nbsp;</p>
+<p>Jei master sugenda, tai vienas i&scaron; mirror bus pakeltas į master:</p>
+<ol>
+<li style="margin-left: 36.0pt; text-indent: -18.0pt;">Seniausiai veikiantis mirror bus pakeltas į master. Jei nebuvo mirror, kuris sinchronizuotas su master, tai tik žinutės, buvusios master, pradings.</li>
+<li style="margin-left: 36.0pt; text-indent: -18.0pt;">Mirror nusprendžia, kad visi anksčiau prisijungę vartotojai atjungti. I&scaron; naujo sudeda į eilę žinutes, kurios buvo pristatytos klientams, bet laukia patvirtinimo.</li>
+<li style="margin-left: 36.0pt; text-indent: -18.0pt;">Vartotojai, kurie pra&scaron;ė informuoti kai eilė sugenda, bus informuoti.</li>
+<li style="margin-left: 36.0pt; text-indent: -18.0pt;">Kadangi įvykdomas pakartotinis padėjimas į eilę, tai klientai, kurie dar kartą nuskaito i&scaron; eilės, turi žinoti, kad gali gauti žinutes, kurias jie jau buvo gave.</li>
+<li style="margin-left: 36.0pt; text-indent: -18.0pt;">Kai pasirinktas mirror tampa master, nei viena žinutė, kuri yra publikuota į veidrodinamą eilę bus prarastos. Žinutės, publikuotos į mazgą, kuris turi eilės mirror, yra nukreipiami į eilės master ir tuomet replikuojamos į visus mirror. Jei master suges, žinutės vis dar siunčiamos į mirror&rsquo;us ir bus įdėti į eilę, vos tik mirror pakelimas į master bus užbaigtas.</li>
+<li style="margin-left: 36.0pt; text-indent: -18.0pt;">Žinutės, kurias klientai publikavo naudojant publikuojančio patvirtinimus, bus patvirtintos net jei master (arba betkurie mirror) tuo metu, kai žinutė yra publikuojama ir publikatorius gauna patvirtinimą. I&scaron; publikuotojo požiūrio publikavimas į veidrodinamą eilę nesiskiria nuo publikavimo į ne veidrodinamą.</li>
+</ol>
+<p>&nbsp;</p>
+<p>Jei vartojama i&scaron; veidrodinamos eilės su noAck=true (t.y. klientas nesiunčia žinučių patvirtinimų), tai žinutės gali būti prarastos. Brokeris laiko žinutę gauta i&scaron; karto, kai tik nusiunčia ją noAck=true klientui. Jei klientas atsijungtų netikėtai, tai žinutė gali būti niekada negauta. Veidrodinamos eilės atveju jei master sugenda, tai žinutės, kurios pakeliui pas noAck=true vartotojus gali būti niekada negautos ir nebus pakartotinai įdėtos į eilę naujuoju master. Dėl galimybės, kad vartojantis klientas yra prisijungęs prie mazgo, kuris i&scaron;lieka, vartotojo įspėjimas apie at&scaron;aukimą yra naudingas identifikuojant kada tokie atsitikimai įvyksta.</p>
+<p>&nbsp;</p>
+<h3>Publikuotojo patvirtinimai ir tranzakcijos</h3>
+<p>Veidrodinamos eilės palaiko publikuotojo patvirtinimus ir tranzakcijas. Tranzakcijos atveju tx.commit0ok bus&nbsp; grąžintas klientui kai tranzakcija bus įvykdyta visuose eilės veidruodžiuose. Kai publikuotojas patvirtina, žinutė bus patvirtinta tik tuomet, kai žinutė yra priimta visuose veidrodžiuose.</p>
+<h3>Srauto valdymas</h3>
+<p>RabbitMQ naudoja kreditais pagrįstą algoritmą, kad apribotų žinučių publikavimo spartą. Publikuotojams leidžiama publikuoti, kai jie gauna kreditą i&scaron; visų eilės veidrodžių. Veidrodis, kuris nei&scaron;duoda kredito, gali pristabdyti publikuotoją. Publikuotojai bus pristabdyti tol, kol visi veidrodžiai i&scaron;duos kreditą arba kol likę mazgai nuspręs atjungti veidrodį nuo blokinio.</p>
+<h3>Master gedimai ir vartototojo at&scaron;aukimas</h3>
+<p>Klientai, kurie vartoja i&scaron; veidrodinamos eilės gali pageidauti žinoti kad eilė, i&scaron; kurios jie skaitė, sugedo. Kai veidrodinama eilė sugenda, žinios apie tai, kurios žinutės nusiųstos kuriam vartotojui, yra prarandamos ir dėl to visos nepatvirtintos žinutės pakartotinai pristatomos su vėliavėle redelivered.</p>
+<p>Vartotojas gali vartoti su x-cancel-on-ha-failover=true. Tokiu atveju vartojimas bus at&scaron;auktas gedimo atveju ir vartotojo informavimas apie at&scaron;aukimą bus i&scaron;siųstas. Tuomet tai yra vartotojo atsakomybė pakartotinai įvykdyti basic.consume, kad pradėtų vartoti i&scaron; naujo.</p>
+<p>Pavyzdžiui:</p>
+<p>Channel&nbsp; channel&nbsp; <strong><span style="color: navy;">=</span></strong> <strong><span style="color: navy;">...;</span></strong></p>
+<p>Consumer consumer <strong><span style="color: navy;">=</span></strong> <strong><span style="color: navy;">...;</span></strong></p>
+<p>Map<strong><span style="color: navy;">&lt;</span></strong>String<strong><span style="color: navy;">,</span></strong> Object<strong><span style="color: navy;">&gt;</span></strong> args <strong><span style="color: navy;">=</span></strong> <strong><span style="color: blue;">new</span></strong> HashMap<strong><span style="color: navy;">&lt;</span></strong>String<strong><span style="color: navy;">,</span></strong> Object<strong><span style="color: navy;">&gt;();</span></strong></p>
+<p>args<strong><span style="color: navy;">.</span></strong>put<strong><span style="color: navy;">(</span></strong><span style="color: gray;">"x-cancel-on-ha-failover"</span><strong><span style="color: navy;">,</span></strong> <strong><span style="color: blue;">true</span></strong><strong><span style="color: navy;">);</span></strong></p>
+<p>channel<strong><span style="color: navy;">.</span></strong>basicConsume<strong><span style="color: navy;">(</span></strong><span style="color: gray;">"my-queue"</span><strong><span style="color: navy;">,</span></strong> <strong><span style="color: blue;">false</span></strong><strong><span style="color: navy;">,</span></strong> args<strong><span style="color: navy;">,</span></strong> consumer<strong><span style="color: navy;">);</span></strong></p>
+<p>&nbsp;</p>
+<h2>Nesinchronizuoti veidrodžiai</h2>
+<p>Mazgas gali įsilieti į blokinį betkuriuo metu. PRiklausomai nuo eilės konfiguracijos, kai mazgas įsilieja į blokinį, eilės gali pridėti veidrodį į naują mazgą. Tuo metu naujas veidrodis bus tu&scaron;čias: jis neturės eilės turinio. Toks veidrodis gaunas naujas žinutes publikuotas į eilę todėl laikui bėgant tiksliai atspindės veidrodinamos eilės uodegą. I&scaron;leidžiant žinutes i&scaron; veidrodinamos eilės, kurios naujajam veidrodžiui trūksta žinučių, galvos dydis mažės iki veidrodžio turinys tiksliai atitiks master turinį. Nuo &scaron;io ta&scaron;ko veidrodis gali būti laikomas pilnai sinchronizuotas, tačiau svarbu pažymėti, jog tai atsitiko dėl klientų, kurie mažina buvusį eilės galvos turinį.</p>
+<p>Naujai pridėtas veidrodis visai neprideda papildomo perteklumo ir pasiekiamumo eilės turiniui, kuris buvo prie&scaron; tai, kai eilės veidrodis buvo pridėtas nebent eilė buvo specialiai sinchonizuota. Kadangi eilė tampa nereaguojančia kol vyksta sinchronizacija, tai pageidautina leisti eilėms, kurių prane&scaron;imai i&scaron;eina, sinchronizuotis natūraliai ir specialiai sinchronizuoti neaktyvias eiles.</p>
+<p>Nustatyti kurie veidrodžiai yra sinchronizuojami</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbitmqctl</span> list_queues name slave_pids synchronized_slave_pids</p>
+<p>&nbsp;</p>
+<p>Rankiniu būdu sinchronizuoti eilę</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbitmqctl</span> sync_queue name</p>
+<p>&nbsp;</p>
+<p>At&scaron;aukti sinchronizaciją</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbitmqctl</span> cancel_sync_queue name</p>
+<p>&nbsp;</p>
+<h3>Mazgų stabdymas ir sinchronizacija</h3>
+<p>Jei sustabdomas RabbitMQ mazgas, kuris turi veidrodinamos eilės master, kaikurie veidrodžiai kitame mazge bus pakelti į master. Jei toliau bus stabdomi mazgai, tai bus pasiektas ta&scaron;kas, kuomet veidrodinama eilė nebeturi veidrodžių, ji egzistuoja tik viename mazge, kuris yra master. Jei veidrodinama eilė buvo paskelbta kaip durable, tai jei paskutinis mazgas i&scaron;jungiamas,&nbsp; durable žinutės eilėje i&scaron;liks po to mazgo pakartotino startavimo. Pakartotiniai startavus mazgus, jei jie buvo anksčiau veidrodinamos eilės dalys, jie i&scaron; naujo prisijungs prie veidrodinamos eilės.</p>
+<p>Kita vertus, nėra būdo mirror&rsquo;ui žinoti ar jo eilės turinys tapo kitoks nei master&rsquo;io, prie kurio jis prisijungia pakartotinai. Taigi kai mirror&rsquo;as prisijungia pakartotiniai prie veidrodinamos eilės, jis i&scaron;meta lauk visą durable turinį, kurį jis jau turi ir startuoja tu&scaron;čias. Tai atitinka veikimą kai naujas mazgas įsilieja į blokinį.</p>
+<h3>Master mazgų, turinčių tik nesinchronizuotus veidrodžius, stabdymas</h3>
+<p>Įprastai RabbitMQ atsisakys persijungti į nesinchronizuotą veidrodį esant kontroliuojamama master i&scaron;jungimui (pvz., stabdant RabbitMQ servisą arba i&scaron;jungiant operacinę sistemą), kad būtų i&scaron;vengta žinučių praradimo; vietoj to visa eilė i&scaron;sijungs lyg nesinchronizuotų veidrodžių visai nebūtų. Nekontroliuojamas master i&scaron;jungimas (pavyzdžiui dėl serverio arba mazgo strigties arba tinklo avarijos) vistiek i&scaron;&scaron;auks persijungimą į nesinchronizuotą veidrodį.</p>
+<p>Norint, kad master mazgai persijungtų į nesinchronizuotus veidrodžius betkokiu atveju (jei pasiekiamumas turi didesnį prioritetą už galimą žinučių praradimą) galima nustatyti tvarkos raktą ha-promote-on-shutdown=always.</p>
+<h3>Master praradimas, kol visi veidrodžiai sustabdyti</h3>
+<p>Įmanoma, kad master bus prarastas, kol visi eilės mirror&rsquo;ai i&scaron;jungti. Įprastai paskutinis eilės mazgas, kuriame i&scaron;&scaron;aukiamas i&scaron;jungimas, taps master ir norima, kad &scaron;is mazgas i&scaron;liktų master, kai jis vėl bus įjungtas (kadangi jis gali turėti žinučių, kurių joks kitas mirror&rsquo;as nematė).</p>
+<p>Tačiau, kai i&scaron;&scaron;aukiamas</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbitmqctl</span> forget_cluster_node</p>
+<p>RabbitMQ mėgins rasti sustabdytą mirror&rsquo;ą kiekvienai eilei, kuri turi savo master mazge (kurį bandome pamir&scaron;ti ), ir pakelti tą mirror&rsquo;ą į master, kai jis vėl bus paleistas. Jei yra daugiau nei vienas kandidatas, tai vėliausiai sustabdytas mirror&rsquo;as bus pasirinktas.</p>
+<p>Svarbu suprasti, kad RabbitMQ gali pakelti sustabdytus mirror&rsquo;us tik forget_cluster_node vykdymo metu, kadangi visi mirror&rsquo;ai, kurie startuojami pakartotinai i&scaron;sivalys savo turinį. Todėl kai &scaron;alinamas prarastas master sustabdytame blokinyje, yra būtina i&scaron;&scaron;aukti</p>
+<p style="border: solid #CCCCCC 1.0pt; padding: 4.0pt 8.0pt 4.0pt 8.0pt; background: whitesmoke; margin-left: 18.0pt; margin-right: 0cm;"><span style="font-family: Consolas; color: red;">$</span><span style="font-family: Consolas; color: teal;"> rabbitmqctl</span> forget_cluster_node</p>
+<p>prie&scaron; paleidžiant mirror&rsquo;us pakartotinai.</p>
+<h3>Paketinis sinchronizavimas</h3>
+<p>Paketas gali būti sukonfiguruotas per eilės argumenta ha-sync-batch-size. Paketinis sinchronizavimas gali paveikti sinchronizavimo procesą priklausomai nuo ha-sync-batch-size reik&scaron;mės.</p>
+<p>Renkantis ha-sync-batch-size reik&scaron;mę reikia įskaityti:</p>
+<ul>
+<li style="text-indent: -18.0pt;">vidutinį žinutės dydį,</li>
+<li style="text-indent: -18.0pt;">tinklo pralaidumą tarp RabbitMQ mazgų,</li>
+<li style="text-indent: -18.0pt;">net_ticktime reik&scaron;mę.</li>
+</ul>
+<h3>Sinchronizacijos konfiguravimas</h3>
+<p>Svarbiausia, kad <strong>kol eilė sinchronizuojama visos eilės operacijos yra blokuotos.</strong></p>
+<p>Eilės sinchronizacija gali būti sukonfiguruota:</p>
+<ul>
+<li style="text-indent: -18.0pt;">ha-sync-mode: manual &ndash; numatytas režimas. Naujas eilės veidrodis negaus esamų žinučių, o gaus tik naujas žinutes. Galima pilnai sinchronizuoti eilę rankiniu būdu.</li>
+<li style="text-indent: -18.0pt;">ha-sync-mode: automatic &ndash; eilė automati&scaron;kai sinchronizuosis, kai naujas mirror&rsquo;as įsilies.</li>
+</ul>
+<h2>Patikimumas</h2>
+<h3>Ry&scaron;io triktys</h3>
+<p>Ry&scaron;io trikties atveju klientas turi sukurti naują sujungimą su brokeriu. Betkurie kanalai, anksčiau atidaryti bus automati&scaron;kai uždaryti ir juos reikės atidaryti pakartotinai.</p>
+<p>Apksritai, kai sujungimai sutrinka, klientas turi būti informuotas apie i&scaron;imtį. Java klientai turi ShutdownListener callback&lsquo;us klasėse Connection ir Channel. .Net klientai turi Iconnection.ConnectionShutdown ir IModel.ModelShutdown įvykius.</p>
+<h4>Patvirtinimai ir atsiklausimai</h4>
+<p>Patvirtinimai leidžia serveriui ir klientui žinoti kada pakartotinai transliuoti žinutes.</p>
+<p>Patvirtinimai gali būti panaudojami abiem kryptimis &ndash; leisti vartotojui nurodyti serveriui, kad vartotojas gavo/apdorojo žinutę, kad serveris nurodytų tą patį tiekėjui. RabbitMQ tai vadinama atsiklausimu (&bdquo;confirm&ldquo;).</p>
+<p>Vos tik vartojanti aplikacija patvirtina žinutę brokeris turi laisvę žinutę pamir&scaron;ti.</p>
+<h4>Atjungtų TCP sujungimų detekcija</h4>
+<p>Norint rasti nutrauktus ry&scaron;ius reikia naudoti hertbeat priemonę.</p>
+<h3>Brokeryje</h3>
+<p>Norint neprarasti žinučių brokeryje būtina susitvarkyti su brokerio pakartotinais paleidimais. Norint, kad per naujus paleidimus i&scaron;liktų žinutės ir brokeriai, reikia užtikrinti, jog jie yra diske.</p>
+<h4>Blokiniai ir didelis pasiekiamumas</h4>
+<p>Jei reikia užtikrinti, kad brokeris i&scaron;gyvens įrangos triktį galime naudoti RabbitMQ blokinį. RabbitMQ blokinyje visi nustatymai (apsikeitimai, jungtys, naudotojai ir kt.) yra veidrodinami visame blokinyje. Eilės veikia kitaip &ndash; jos pagal nutylėjimą yra tik viename mazge, tačiau pasirinktinai yra veidrodinami keliuose mazguose. Eilės i&scaron;lieka matomos ir pasiekiamos i&scaron; visų mazgų nepaisant to, kur jos yra.</p>
+<p>Veidrodinamos eilės dubliuoja jų turinį visuose sukonfiguruotuose blokinio mazguose toleruodamos triktis ir be žinučių praradimo. I&scaron; kitos pusės, vartojančios aplikacijos turi žinoti, jog kai eilės genda jų vartotojai bus at&scaron;aukti ir jiems reikės vartoti i&scaron; naujo.</p>
+<h3>Prodiuseryje</h3>
+<p>Kai naudojami patvirtinimai, prodiuseriai atsistatantys i&scaron; kanalo arba jungties gedimo turėtų pakartotinai i&scaron;transliuoti žinutes, kurioms i&scaron; brokerio nebuvo gautas patvirtinimas. Yra galimybė sudubliuoti žinutes kadangi brokeris galėjo nei&scaron;siųsti patvirtinimo, kuris niekada nepasiekė prodiuserio. Taigi vartotojų aplikacijos turės atlikti dedublikavimą arba apdoroti žinutes idempotenti&scaron;kai.</p>
+<h4>Žinučių paskirstymo užtikrinimas</h4>
+<p>Kaikuriomis sąlygomis gali būti svarbu prodiuseriams užtikrinti, kad jų žinutės yra paskirstomos į eiles (tačiau ne visuomet &ndash; pub-sub sistemos atveju prodiuseriai tik publikuos ir jei nei vienas vartotojas nebus suinteresuotas, tai yra korekti&scaron;ka žinutes &scaron;alinti).</p>
+<p>Norint užtikrinti, jog žinutės nukreipiamos į vieną žinomą eilę, prodiuseris gali tiesiog deklaruoti paskirties eilę ir publikuoti tiesiai į ją. Jei žinutės gali būti nukreipiamos komplikuotesniais būdais, tačiau prodiuseriui vis dar reikia žinoti ar jos pasiekė nors vieną eilę, prodiuseris gali nustatyti reik&scaron;mę `mandatory` vėliavėlėje basic.return užtikrinant, jog basic.return (turintis atsakymo kodą ir kokį nors tekstinį paai&scaron;kinimą) bus i&scaron;siųstas klientui jei nebuvo tinkamai sujungtų eilių.</p>
+<p>Prodiuseriai turėtų žinoti, jog publikuojant į blokinyje esamą mazgą, jei viena arba daugiau prijungtų prie apsikeitimo paskirties eilių turi veidrodžius blokinyje, yra įmanoma, kad atsitiks pauzės dėl ry&scaron;io tarp magų trikčių, atsirandančių dėl srauto tarp dublikatų ir master eilių valdymo proceso.</p>
+<h3>Vartotojuje</h3>
+<p>Tinklo gedimo atveju (sugedus mazgui), žinutės gali būti dubliuojamos ir vartotojai turi būti pasirengę tai apdoroti. Jei įmanoma lengiau nei dirbti su dedublikacija paprasčiau yra užtikrint, jog vartotojai žinutes apdoroja idempotenti&scaron;kai.</p>
+<p>Jei žinutė vartotojui pristatyta ir vėliau i&scaron; naujo įdėta į eilę (nes, pvz., žinutė nebuvo patvirtinta prie&scaron; vartotojui jungčiai pradingstant), tai RabbitMQ nustatys vėliavėlę `redelivered` kai ji yra pakartotinai pristatoma (tam pačiam arba kitam vartotojui). Tai yra požymis, jog vartotojai galėjo matyti &scaron;ią žinutę prie&scaron; tai (nepaisant to tai nėra garantuojama, žinutė galėjo i&scaron;eiti i&scaron; brokerio, tačiau nepasiekė vartotojo prie&scaron; tai kai dingo ry&scaron;ys). Jei vėliavėlė `redelivered` yra nenustatyta, tai yra garantuojama, jog žinutė nebuvo matyta.</p>
+<h4>Vartotojo įspėjimas apie at&scaron;aukimą</h4>
+<p>Kaikuriomis sąlygomis serveriui reikia galėti at&scaron;aukti vartotoją dėl to, kad eilė, i&scaron; kurios jis vartojo, buvo panaikinta arba sugedo. &Scaron;iuo atveju vartotojas turėtų pakartotinai vartoti, tačiau žinodamas, jog gali gauti žinutę, kurią jau yra matęs.</p>
+<h4>Žinutės, kurios negali būti apdorotos</h4>
+<p>Jei vartotojas aptinka žinutę, kurios negali apdoroti, tai jis gali atmesti žinutę su `basic.reject` (arba `basic.nack`) arba pra&scaron;ant serverį pakartotinai padėti ją į eilę arba ne.</p>
+<h2>Paskirstytas RabbitMQ</h2>
+<p>Rabbit suteikia du įskiepius padėti paskirstyti mazgus nepatikimuose tinkluose: federacija ir shovel.</p>
+<p>Kai jungiami blokiniai su federacija arba shovel pageidautina užtikrinti, jog federacijos linkai ir shovel&lsquo;iai toleruoja mazgų klaidas. Federacija automati&scaron;kai paskirstys link&lsquo;us tarp atsisiuntimo srauto blokinių ir perjungs į juos įvykus atsisiuntimo srauto mazgo trikčiai. Norint prisijungti prie naujo i&scaron;siuntimo srauto, kai i&scaron;siuntimo srauto mazgas sugenda, galima nustatyti kelis perteklinius URI i&scaron;siuntimo srautui arba jungtis per TCP apkrovos i&scaron;lygintoją.</p>
+<p>Naudojant shovel įmanoma nustatyti perteklinius brokerius &scaron;altinio arba paskirties sakinyje visgi neįmanoma padaryti shovel pertekliniu.</p>
+<h2>Prane&scaron;imas apie užblokuotą jungtį</h2>
+<p>Kartais klientams pageidautina gauti prane&scaron;imą, kai jų sujungimas yra užblokuojamas dėl brokerio i&scaron;teklių (atminties arba disko) trūkumo.</p>
+<h3>Prane&scaron;imai apie užblokuotus sujungimus Java kliente</h3>
+<p>ConnectionFactory factory <strong><span style="color: navy;">=</span></strong> <strong><span style="color: blue;">new</span></strong> ConnectionFactory<strong><span style="color: navy;">();</span></strong></p>
+<p>Connection connection <strong><span style="color: navy;">=</span></strong> factory<strong><span style="color: navy;">.</span></strong>newConnection<strong><span style="color: navy;">();</span></strong></p>
+<p>connection<strong><span style="color: navy;">.</span></strong>addBlockedListener<strong><span style="color: navy;">(</span></strong><strong><span style="color: blue;">new</span></strong> BlockedListener<strong><span style="color: navy;">()</span></strong></p>
+<p><strong><span style="color: navy;">{</span></strong></p>
+<p>&nbsp;&nbsp;&nbsp; <span style="color: #8000ff;">public</span> <span style="color: #8000ff;">void</span> handleBlocked<strong><span style="color: navy;">(</span></strong>String reason<strong><span style="color: navy;">)</span></strong></p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong><span style="color: blue;">throws</span></strong> IOException</p>
+<p>&nbsp;&nbsp;&nbsp; <strong><span style="color: navy;">{</span></strong></p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color: green;">// Sujungimas dabar yra užblokuotas</span></p>
+<p>&nbsp;&nbsp;&nbsp; <strong><span style="color: navy;">}</span></strong></p>
+<p>&nbsp;&nbsp;&nbsp;</p>
+<p>&nbsp;&nbsp;&nbsp; <span style="color: #8000ff;">public</span> <span style="color: #8000ff;">void</span> handleUnblocked<strong><span style="color: navy;">()</span></strong></p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong><span style="color: blue;">throws</span></strong> IOException</p>
+<p>&nbsp;&nbsp;&nbsp; <strong><span style="color: navy;">{</span></strong></p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color: green;">// Sujungimas dabar yra neužblokuotas</span></p>
+<p>&nbsp;&nbsp;&nbsp; <strong><span style="color: navy;">}</span></strong></p>
+<p><strong><span style="color: navy;">});</span></strong></p>
+<p>&nbsp;</p>
+<h3>Kai prane&scaron;imai yra siunčiami</h3>
+<p>Prane&scaron;imas `connection.blocked` yra siunčiamas publikuojanties sujungimmams pirmą kartą, kai RabbitMQ pritrūksta i&scaron;teklių. Pvz., kai RabbitMQ mazgas pastebi, jog RAM yra mažai, tai siunčia `connection.blocked` visiems publikuojantiems klientams, kurie palaiko &scaron;ią funkciją. Jei prie&scaron; sujungimus atblokuojant mazgui taip pat pradeda trūkti disko vietos, kitas `connection.blocked` bus i&scaron;siųstas.</p>
+<p>`Connection.unblocked` i&scaron;siunčiamas, kai <em>visi</em> i&scaron;teklių pavojaus signalai yra užgesinami ir sujungimas yra visi&scaron;kai neužblokuotas.</p>
+<h2>Atminties ir disko pavojaus signalai</h2>
+<p>Dviem atvejais RabbitMQ nustos skaityti i&scaron; kliento tinklo prievadų tam, kad neleistų strigimų:</p>
+<ul>
+<li style="text-indent: -18.0pt;">kai atminties naudojimas vir&scaron;yja konfiguracinę ribą,</li>
+<li style="text-indent: -18.0pt;">kai disko vietos kiekis sumažėja mažiau konfiguracinės ribos.</li>
+</ul>
+<p>Abiem atvejais serveris laikinai <em>blokuos</em> sujungimus &ndash; serveris nustos skaityti i&scaron; prisijungusių klientų, publikuojančių žinutes, prievadų. Visi tinklo sujungimai bus rodomi per rabbitmqctl su `blocking ` jei jie nebandė publikuoti ir gali tęsti arba `blocked`, jei jie publikavo ir dabar yra sustabdyti.</p>
+<p>Atminties ir disko pavojaus signalai blokinyje yra bendri: jei vienas mazgas vir&scaron;yja ribas, tai visi mazgai užblokuos sujungimus.</p>
+<h2>Srauto valdymas</h2>
+<p>RabbitMQ mažins greitį sujungimų, kurie per greitai publikuoja, kad eilės suspėtų. Jokios konfiguracijos nereikia.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+    </body>
+</html>
